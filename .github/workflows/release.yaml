@@ -1,0 +1,128 @@
+name: Release Binaries
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.compare-versions.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: compare-versions
+        name: Compare Cargo.toml version with Git tag
+        run: |
+          set -e
+
+          VERSION_IN_CARGO=`cargo pkgid | cut -d "#" -f2`
+          GIT_TAG=`git describe --tags --exact-match --match 'v[0-9]*'`
+          VERSION_IN_GIT_TAG=${GIT_TAG#v}
+
+          echo "📦 Cargo.toml version: $VERSION_IN_CARGO"
+          echo "🏷️ Git tag version:    $VERSION_IN_GIT_TAG"
+
+          if [ "$VERSION_IN_CARGO" != "$VERSION_IN_GIT_TAG" ]; then
+            echo "❌ Version mismatch between Cargo.toml and Git tag!"
+            exit 1
+          else
+            echo "✅ Version match confirmed"
+            echo "version=$VERSION_IN_CARGO" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt,clippy
+
+      - name: Check check
+        run: cargo check
+
+      - name: Cargo test
+        run: cargo test --all-features
+
+      - name: Rustfmt Check
+        uses: actions-rust-lang/rustfmt@v1
+
+      - name: Clippy
+        run: cargo clippy --locked
+
+  release-binaries:
+    runs-on: ${{ matrix.os }}
+    needs: qa
+
+    strategy:
+      matrix:
+        include:
+          - build: linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - build: linux
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - build: linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - build: linux
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+          - build: macos
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - build: macos
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - build: windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - build: windows
+            os: windows-latest
+            target: aarch64-pc-windows-msvc
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build binary
+        uses: houseabsolute/actions-rust-cross@v1
+        with:
+          command: build
+          target: ${{ matrix.target }}
+          args: "--locked --release"
+          strip: true
+
+      - name: Archive
+        shell: bash
+        run: |
+          binary_name="zstd-soil-volume"
+          binary_path="target/${{ matrix.target }}/release/$binary_name"
+          archive_name="$binary_name-${{needs.qa.outputs.version}}-${{ matrix.target }}"
+
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a -tzip -mx=9 $archive_name.zip $binary_path.exe
+            echo "ARCHIVE=$archive_name.zip" >> $GITHUB_ENV
+          else
+            gzip -k -9 -c $binary_path > $archive_name.gz
+            echo "ARCHIVE=$archive_name.gz" >> $GITHUB_ENV
+          fi
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ env.ARCHIVE }}
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ARCHIVE }}

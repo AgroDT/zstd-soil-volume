@@ -1,0 +1,31 @@
+[package]
+name = "zstd-soil-volume"
+version = "1.0.0"
+authors = [
+    "Petr Tsymbarovich <petr@tsymbarovich.ru>",
+]
+edition = "2024"
+description = "CLI tools to work with three.js ZSTD soil volumes"
+repository = "https://github.com/AgroDT/zstd-soil-volume"
+license-file = "LICENSE"
+publish = false
+
+[profile.release]
+lto = true
+strip = "debuginfo"
+panic = "abort"
+
+[dependencies]
+anyhow = "1.0.98"
+byteorder = "1.5.0"
+clap = { version = "4.5.38", features = ["derive"] }
+clio = { version = "0.3.5", features = ["clap-parse"] }
+console = "0.15.11"
+glob = "0.3.2"
+image = { version = "0.25.6", default-features = false, features = ["bmp"] }
+indicatif = "0.17.11"
+mimalloc = "0.1.46"
+zstd = { version = "0.13.3", default-features = false, features = ["zstdmt"] }
+
+[dev-dependencies]
+tempfile = "3.20.0"

@@ -1,0 +1,8 @@
+#!/bin/sh
+
+set -ex
+
+cargo check
+cargo test
+cargo fmt
+cargo clippy --locked
