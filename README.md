@@ -19,8 +19,14 @@ and [three-soil-volume-shader](https://github.com/AgroDT/three-soil-volume-shade
 ## Installation
 
 Download a prebuilt binary for your platform from the
-[Releases](https://github.com/AgroDT/zstd-soil-volume/releases/latest),
-or build from source with:
+[Releases](https://github.com/AgroDT/zstd-soil-volume/releases/latest).
+You can verify the downloaded file with the GitHub cli:
+
+```sh
+gh attestation verify --owner AgroDT <filename-or-url>
+```
+
+Or you can build from source with:
 
 ```sh
 cargo install --git https://github.com/AgroDT/zstd-soil-volume
